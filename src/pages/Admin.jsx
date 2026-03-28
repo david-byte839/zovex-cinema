@@ -62,7 +62,6 @@ const inp = { width: "100%", background: "#F0F0F5", border: "1.5px solid #d2d2d7
 const card = { background: "#fff", borderRadius: 16, padding: 18, marginBottom: 14, boxShadow: "0 4px 20px rgba(0,0,0,.08)" };
 const dot = <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0071e3", display: "inline-block", marginLeft: 8, flexShrink: 0 }} />;
 
-// ─── TMDB Search ──────────────────────────────────────────────
 function TMDBSearch({ tmdbKey, onSelect }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
@@ -110,7 +109,6 @@ function TMDBSearch({ tmdbKey, onSelect }) {
   );
 }
 
-// ─── Content Form ─────────────────────────────────────────────
 function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [status, setStatus] = useState(null);
@@ -118,7 +116,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState("");
-  const isSeries = form.series_name || form.season_number || form.episode_number;
 
   useEffect(() => {
     if (tmdbData) {
@@ -160,9 +157,14 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
     if (!form.title.trim()) { onToast("⚠️ הכנס שם קודם"); return; }
     setAiLoading(true); setStatus({ text: "✨ AI כותב תיאור...", type: "" });
     try {
-      const { InvokeLLM } = await import("@/integrations/Core");
-      const result = await InvokeLLM({ prompt: `כתוב תיאור קצר ומרתק בעברית (3 משפטים, סגנון נטפליקס) לסרט: "${form.title}". רק התיאור עצמו.` });
-      if (result) { upd("description", result); setStatus({ text: "✅ תיאור נוצר!", type: "ok" }); }
+      const result = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 200, messages: [{ role: "user", content: `כתוב תיאור קצר ומרתק בעברית (3 משפטים, סגנון נטפליקס) לסרט: "${form.title}". רק התיאור עצמו.` }] })
+      });
+      const data = await result.json();
+      const text = data.content?.[0]?.text;
+      if (text) { upd("description", text); setStatus({ text: "✅ תיאור נוצר!", type: "ok" }); }
       else setStatus({ text: "⚠️ לא התקבל תיאור", type: "err" });
     } catch { setStatus({ text: "❌ שגיאה", type: "err" }); }
     setAiLoading(false);
@@ -200,7 +202,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
         <input value={form.title} onChange={e => upd("title", e.target.value)} placeholder="שם הסרט..." style={inp} />
       </Field>
 
-      {/* סוג תוכן */}
       <Field label="סוג תוכן">
         <div style={{ display: "flex", gap: 8 }}>
           {[["movie", "🎬 סרט"], ["series", "📺 סדרה"]].map(([v, l]) => (
@@ -213,7 +214,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
         </div>
       </Field>
 
-      {/* שדות סדרה */}
       {form.series_name !== "" && form.series_name !== undefined && (
         <div style={{ background: "#F0F0F5", borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <Field label="שם הסדרה">
@@ -246,7 +246,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
           style={{ ...inp, resize: "none", minHeight: 80 }} />
       </Field>
 
-      {/* פוסטר */}
       <Field label="תמונת פוסטר">
         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
           <div style={{ width: 64, minHeight: 88, borderRadius: 12, background: "#F0F0F5", border: "1.5px solid #d2d2d7", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}
@@ -264,7 +263,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
         <input id="poster-upload" type="file" accept="image/*" style={{ display: "none" }} onChange={handleUpload} />
       </Field>
 
-      {/* וידאו */}
       <Field label="סוג מקור וידאו">
         <select value={form.type} onChange={e => upd("type", e.target.value)} style={inp}>
           {VIDEO_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -274,9 +272,9 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
       <Field label="Video ID">
         <input value={form.video_id} onChange={e => upd("video_id", e.target.value)} placeholder="מזהה הוידאו..." dir="ltr" style={inp} />
         <div style={{ marginTop: 6, fontSize: 11, color: "#6e6e73" }}>
-          {form.type === "youtube" && "YouTube: הID אחרי watch?v= (לדוגמה: dQw4w9WgXcQ)"}
+          {form.type === "youtube" && "YouTube: הID אחרי watch?v="}
           {form.type === "drive" && "Google Drive: הID מהקישור של הקובץ"}
-          {form.type === "vimeo" && "Vimeo: המספר בקישור (לדוגמה: 123456789)"}
+          {form.type === "vimeo" && "Vimeo: המספר בקישור"}
           {form.type === "cloudinary" && "Cloudinary: שם הקובץ ללא סיומת"}
           {form.type === "streamable" && "Streamable: הקוד הקצר בקישור"}
           {form.type === "rumble" && "Rumble: הID מהקישור"}
@@ -289,7 +287,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
         </Field>
       )}
 
-      {/* כפתורים */}
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button onClick={generateAI} disabled={aiLoading}
           style={{ flex: 1, background: "#34c759", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -305,7 +302,6 @@ function ContentForm({ editItem, tmdbData, onSaved, onToast }) {
   );
 }
 
-// ─── Manage List ──────────────────────────────────────────────
 function CategorySection({ catName, items, onEdit, onDelete }) {
   const [open, setOpen] = useState(true);
   return (
@@ -372,10 +368,75 @@ function ManageList({ items, onEdit, onDelete }) {
   );
 }
 
-// ─── Settings ─────────────────────────────────────────────────
-function SettingsPanel({ tmdbKey, setTmdbKey, onSaveKeys, onRunChecks, checks, checkingSystem, onEnrich, enriching, enrichStatus, onExport }) {
+function CSVImport({ onImport, onToast }) {
+  const [importing, setImporting] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    const text = await file.text();
+    const lines = text.split('\n').filter(l => l.trim());
+    const headers = lines[0].split(',').map(h => h.trim());
+    const movies = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(',');
+      const obj = {};
+      headers.forEach((h, idx) => obj[h] = (vals[idx] || '').trim());
+      if (!obj.title) continue;
+      const url = obj.video_url || '';
+      let type = 'direct';
+      if (url.includes('youtube') || url.includes('youtu.be')) type = 'youtube';
+      else if (url.includes('drive.google')) type = 'drive';
+      else if (url.includes('vimeo')) type = 'vimeo';
+      else if (url.includes('dailymotion')) type = 'dailymotion';
+      else if (url.includes('rumble')) type = 'rumble';
+      else if (url.includes('archive.org')) type = 'archive';
+      else if (url.includes('kaltura')) type = 'kaltura';
+      else if (url.includes('ok.ru')) type = 'okru';
+      else if (url.includes('cdn-redge')) type = 'kan';
+      movies.push({
+        id: Date.now().toString() + i,
+        title: obj.title,
+        video_id: url,
+        type,
+        category: obj.category || 'סרטים',
+        series_name: obj.series_name || null,
+        season_number: obj.season_number ? Number(obj.season_number) : null,
+        episode_number: obj.episode_number ? Number(obj.episode_number) : null,
+        thumbnail_url: obj.thumbnail_url || '',
+        description: obj.description || '',
+        year: Number(obj.year) || 2026,
+        tags: [],
+        created_date: new Date().toISOString(),
+      });
+    }
+    const existing = JSON.parse(localStorage.getItem('zovex_movies') || '[]');
+    localStorage.setItem('zovex_movies', JSON.stringify([...existing, ...movies]));
+    onToast(`✅ יובאו ${movies.length} תכנים!`);
+    if (onImport) onImport();
+    setImporting(false);
+    e.target.value = '';
+  };
+
+  return (
+    <div style={card}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center" }}>{dot}📥 ייבוא CSV</div>
+      <p style={{ fontSize: 12, color: "#6e6e73", marginBottom: 12 }}>עמודות: title, video_url, category, series_name, season_number, episode_number</p>
+      <button onClick={() => document.getElementById('csv-import').click()} disabled={importing}
+        style={{ width: "100%", background: "#5e5ce6", color: "#fff", border: "none", borderRadius: 12, padding: 12, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        {importing ? <Loader2 size={14} style={{ animation: "spin .6s linear infinite" }} /> : "📂 העלה קובץ CSV"}
+      </button>
+      <input id="csv-import" type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFile} />
+    </div>
+  );
+}
+
+function SettingsPanel({ tmdbKey, setTmdbKey, onSaveKeys, onRunChecks, checks, checkingSystem, onEnrich, enriching, enrichStatus, onExport, onImport, onToast }) {
   return (
     <div dir="rtl">
+      <CSVImport onImport={onImport} onToast={onToast} />
+
       <div style={card}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, display: "flex", alignItems: "center" }}>{dot}מפתחות API</div>
         <Field label="TMDB API Key (v3)">
@@ -421,7 +482,6 @@ function SettingsPanel({ tmdbKey, setTmdbKey, onSaveKeys, onRunChecks, checks, c
   );
 }
 
-// ─── Main Admin ───────────────────────────────────────────────
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("browse");
   const [movies, setMovies] = useState([]);
@@ -432,7 +492,7 @@ export default function Admin() {
   const [toast, setToast] = useState("");
   const [tmdbKey, setTmdbKey] = useState(() => localStorage.getItem("zovex_tmdb_key") || "");
   const [checks, setChecks] = useState([
-    { id: "storage", msg: "⏳ Base44 — לא נבדק", state: "" },
+    { id: "storage", msg: "⏳ Storage — לא נבדק", state: "" },
     { id: "tmdb",    msg: "⏳ TMDB API — לא נבדק", state: "" },
   ]);
   const [checkingSystem, setCheckingSystem] = useState(false);
@@ -471,10 +531,12 @@ export default function Admin() {
     setCheckingSystem(true);
     const upd = (id, state, msg) => setChecks(p => p.map(c => c.id === id ? { ...c, state, msg } : c));
     const delay = ms => new Promise(r => setTimeout(r, ms));
-    upd("storage", "checking", "🔄 Base44 — בודק...");
+    upd("storage", "checking", "🔄 Storage — בודק...");
     await delay(400);
-    try { await Movie.list("-created_date", 1); upd("storage", "ok", `✅ Base44 — מחובר · ${movies.length} סרטים ✓`); }
-    catch { upd("storage", "err", "❌ Base44 — שגיאת חיבור"); }
+    try {
+      const count = JSON.parse(localStorage.getItem('zovex_movies') || '[]').length;
+      upd("storage", "ok", `✅ Storage — תקין · ${count} תכנים`);
+    } catch { upd("storage", "err", "❌ Storage — שגיאה"); }
     upd("tmdb", "checking", "🔄 TMDB — מתחבר...");
     await delay(400);
     if (!tmdbKey) { upd("tmdb", "err", "❌ TMDB — מפתח לא הוזן"); }
@@ -525,7 +587,6 @@ export default function Admin() {
     <div style={{ background: "#F5F5F7", minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif" }} dir="rtl">
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* Top bar */}
       <div style={{ background: "rgba(245,245,247,.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid #d2d2d7", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: 2, background: "linear-gradient(135deg,#0071e3,#5e5ce6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
           ZOVEX <span style={{ fontSize: 12, fontWeight: 400, WebkitTextFillColor: "#6e6e73" }}>Admin</span>
@@ -536,21 +597,17 @@ export default function Admin() {
         </button>
       </div>
 
-      {/* Nav */}
       <div style={{ background: "rgba(245,245,247,.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid #d2d2d7", display: "flex", position: "sticky", top: 0, zIndex: 10 }}>
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id !== "add") { setEditItem(null); setTmdbData(null); } }}
-            style={{ flex: 1, padding: "12px 4px", textAlign: "center", fontSize: 10, fontWeight: 700, color: activeTab === tab.id ? "#0071e3" : "#6e6e73", borderBottom: `2px solid ${activeTab === tab.id ? "#0071e3" : "transparent"}`, background: "none", border: "none", borderBottom: `2px solid ${activeTab === tab.id ? "#0071e3" : "transparent"}`, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+            style={{ flex: 1, padding: "12px 4px", textAlign: "center", fontSize: 10, fontWeight: 700, color: activeTab === tab.id ? "#0071e3" : "#6e6e73", background: "none", border: "none", borderBottom: `2px solid ${activeTab === tab.id ? "#0071e3" : "transparent"}`, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <tab.icon size={16} />
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Content */}
       <div style={{ padding: 16, paddingBottom: 80 }}>
-
-        {/* תכנים */}
         {activeTab === "browse" && (
           <div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
@@ -589,7 +646,6 @@ export default function Admin() {
           </div>
         )}
 
-        {/* הוסף */}
         {activeTab === "add" && (
           <div>
             <TMDBSearch tmdbKey={tmdbKey} onSelect={x => { setTmdbData(x); setEditItem(null); }} />
@@ -597,12 +653,10 @@ export default function Admin() {
           </div>
         )}
 
-        {/* ניהול */}
         {activeTab === "manage" && (
           <ManageList items={movies} onEdit={handleEdit} onDelete={handleDelete} />
         )}
 
-        {/* הגדרות */}
         {activeTab === "settings" && (
           <SettingsPanel
             tmdbKey={tmdbKey} setTmdbKey={setTmdbKey}
@@ -610,6 +664,8 @@ export default function Admin() {
             onRunChecks={runChecks} checks={checks} checkingSystem={checkingSystem}
             onEnrich={autoEnrich} enriching={enriching} enrichStatus={enrichStatus}
             onExport={exportData}
+            onImport={loadMovies}
+            onToast={showToast}
           />
         )}
       </div>
